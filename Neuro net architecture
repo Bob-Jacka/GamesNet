@@ -1,0 +1,8 @@
+
+                                         Optimizer
+                                             |
+                                          GameNet
+                                      /      |        \
+                           Neuro_block  Neuro_block  Neuro_block
+                               |             |           |
+                             conv2d       conv2d       linear
