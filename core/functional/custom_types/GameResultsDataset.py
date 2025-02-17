@@ -3,6 +3,7 @@ from typing import Any
 
 import pandas as pd
 from PIL import Image
+from termcolor import colored
 from torch.utils.data import (
     Dataset,
     ConcatDataset
@@ -39,7 +40,8 @@ class GameResultsDataset(Dataset):
             self.target_transform = target_transform
         except Exception as e:
             print(e.__cause__)
-            print("An error occurred in init custom game results dataset.")
+            print(e.with_traceback(None))
+            print(colored("An error occurred in init custom game results dataset.", 'red'))
 
     def __add__(self, other: "Dataset[_T_co]") -> "ConcatDataset[_T_co]":
         """
@@ -50,7 +52,7 @@ class GameResultsDataset(Dataset):
         if other is not None:
             return super().__add__(other)
         else:
-            print('Error in adding element to dataset.')
+            print(colored('Error in adding element to dataset.', 'red'))
 
     def __getitem__(self, idx: int) -> _T_co:
         """
@@ -63,13 +65,12 @@ class GameResultsDataset(Dataset):
             image = Image.open(img_path)
             label = self.img_labels.iloc[idx, 1]
             image = self.transform(image).unsqueeze(0)
-            print('Image transform invoked.')
             if self.target_transform:
                 label = self.target_transform(label)
                 print('Label target transform invoked.')
             return image, label
         else:
-            print('Error occurred in inner get item method of custom dataset.')
+            print(colored('Error occurred in inner get item method of custom dataset.', 'red'))
 
     def __len__(self) -> int:
         """
@@ -91,7 +92,7 @@ class GameResultsDataset(Dataset):
         if self.img_labels is not None:
             return self.img_labels
         else:
-            print('Image labels are None.')
+            print(colored('Image labels are None.', 'red'))
 
     def get_img_dir(self) -> str | None:
         """
@@ -101,7 +102,7 @@ class GameResultsDataset(Dataset):
         if self.img_dir is not None:
             return self.img_dir
         else:
-            print('Image directory is None.')
+            print(colored('Image directory is None.', 'red'))
 
     def get_transform(self) -> Compose | None:
         """
@@ -111,7 +112,7 @@ class GameResultsDataset(Dataset):
         if self.transform is not None:
             return self.transform
         else:
-            print('Transform is None.')
+            print(colored('Transform is None.', 'red'))
 
     def get_target_transform(self) -> Any | None:
         """
@@ -121,4 +122,4 @@ class GameResultsDataset(Dataset):
         if self.target_transform is not None:
             return self.target_transform
         else:
-            print('Target transform is None.')
+            print(colored('Target transform is None.', 'red'))

@@ -6,19 +6,29 @@ import csv
 import os
 import stat
 from enum import Enum
+from os import PathLike
+from os.path import exists
 
 from PIL import Image
 from matplotlib import pyplot as mpl
+from termcolor import colored
+from torch import Tensor
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from core.functional.Settings import input_img_size, success_img_indicator, failure_img_indicator
+from core.functional.Settings import (
+    input_img_size,
+    success_img_indicator,
+    failure_img_indicator,
+    __static_pic_ext__,
+    user_input_cursor
+)
 from core.functional.custom_types.GameResultsDataset import GameResultsDataset
 
 transform_func_train = transforms.Compose([
-    transforms.Grayscale(),
     transforms.ColorJitter(brightness=0.3, contrast=0.4),
     transforms.GaussianBlur(5),
+    transforms.Grayscale(),
     transforms.RandomCrop(2),
     transforms.RandomErasing(),
     transforms.Resize(input_img_size),
@@ -27,7 +37,8 @@ transform_func_train = transforms.Compose([
     transforms.Normalize((0.5,), (0.5,))
 ])
 """
-Функция для преобразования данных для обучения модели.
+Heavy version of transform function.
+Performs a lot of transformation, like color jitter, random crop and random erasing.
 """
 
 transform_func_classify = transforms.Compose([
@@ -37,7 +48,8 @@ transform_func_classify = transforms.Compose([
     transforms.Normalize((0.5,), (0.5,))
 ])
 """
-Функция для преобразования данных в те которые модель понимает.
+Version of transform function for classify task.
+Performs transformation for images before their classification.
 """
 
 transform_func_lite = transforms.Compose([
@@ -48,6 +60,7 @@ transform_func_lite = transforms.Compose([
 ])
 """
 Lite version of the transform function.
+Performs lite number of transformation. Same as classify transformations, but for semantics value their different functions.
 """
 
 
@@ -59,20 +72,32 @@ class Test_results(Enum):
     FAILED = 'Fail',
     SKIPPED = 'Skip'
 
+    def get_value(self):
+        """
+        Method for receiving value of enum object.
+        :return: string value of enum object.
+        """
+        return self.value
 
-def proceed_image(path: str):
+
+def proceed_image(path: str | PathLike) -> Tensor:
     """
-    Function to proceed image with matplot lib methods.
+    Function to proceed image with matplotlib methods.
     :return: torch tensor.
     """
-    print('Proceed image invoked.')
-    image = Image.open(path)
-    image.resize(input_img_size)
-    pass  # TODO дописать метод
+    try:
+        print('Proceed image invoked.')
+        image = Image.open(path)
+        image.resize(input_img_size)
+        proceeded_image = transform_func_classify(image)
+        return proceeded_image
+    except Exception as e:
+        print(e.__cause__)
+        print(colored(f'Error occurred in proceed_image function - {e.with_traceback(None)}.', 'red'))
 
 
-def get_dataloader(labels_dir_path: str, img_dir_path: str, batch_size=64, shuffle_sets=True) -> tuple[
-                                                                                                     DataLoader, DataLoader | None] | None:
+def get_dataloader(labels_dir_path: str | PathLike, img_dir_path: str | PathLike, batch_size=64, shuffle_sets=True) -> \
+        tuple[DataLoader, DataLoader | None] | None:
     """
     Function for creating dataloader. First DataLoader - train, Second DataLoader - validate.
     :param img_dir_path: path to directory where images are stored.
@@ -93,13 +118,13 @@ def get_dataloader(labels_dir_path: str, img_dir_path: str, batch_size=64, shuff
         if train_loader is not None and test_loader is not None:
             return train_loader, test_loader
         elif train_loader is not None and test_loader is None:
-            print('Be careful, only first dataloader is not None.')
+            print(colored('Be careful, only first dataloader is not None.', 'blue'))
             return train_loader, None
         else:
-            print('Both, train dataloader and test dataloader are None.')
+            print(colored('Both, train dataloader and test dataloader are None.', 'red'))
     except RuntimeError as e:
         print(e.__cause__)
-        print("Error in dataloader create.")
+        print(colored(f'Error in dataloader create - {e.with_traceback(None)}.', 'red'))
 
 
 def show_img(image_size: tuple[int, int] = (700, 700)):
@@ -107,15 +132,19 @@ def show_img(image_size: tuple[int, int] = (700, 700)):
     Function for showing image by matplot library.
     :return: nothing.
     """
-    figure = mpl.figure(figsize=image_size)
-    for i in range(1):
-        # sample_idx = torch.randint(len(training_data), size=(1,)).item()
-        # img, label = training_data[sample_idx] # TODO исправить значения
-        figure.add_subplot(i)
-        mpl.title('Image')
-        mpl.axis('off')
-        # plt.imshow(img.squeeze(), cmap="gray")
-    mpl.show()
+    try:
+        figure = mpl.figure(figsize=image_size)
+        for i in range(1):
+            # sample_idx = torch.randint(len(training_data), size=(1,)).item()
+            # img, label = training_data[sample_idx] # TODO исправить значения
+            figure.add_subplot(i)
+            mpl.title('Image')
+            mpl.axis('off')
+            # plt.imshow(img.squeeze(), cmap="gray")
+        mpl.show()
+    except Exception as e:
+        print(e.__cause__)
+        print(colored(f'Error occurred in show_img function - {e.with_traceback(None)}', 'red'))
 
 
 test_labels: dict[str, int] = {
@@ -127,7 +156,8 @@ Map of test labels.
 """
 
 
-def update_labels(labels_dir_path: str, images_dir_name: str = 'images', labels_file_name: str = 'labels.csv'):
+def update_labels(labels_dir_path: str | PathLike, images_dir_name: str = 'images',
+                  labels_file_name: str = 'labels.csv'):
     """
     Static function for updating labels in csv file.
     Opens file if it exits or creates new file if it not and then rewritten (written) data to file on every call.
@@ -143,27 +173,162 @@ def update_labels(labels_dir_path: str, images_dir_name: str = 'images', labels_
     :param labels_file_name: name of the labels file.
     :return: None.
     """
-    os.chmod(labels_dir_path + labels_file_name, stat.S_IWUSR)
-    with open(labels_dir_path + labels_file_name, 'w+') as csvfile:
-        csvwriter = csv.writer(csvfile, lineterminator='\n')
-        label: int
-        row: list = list()  # row of the csv file.
-        images_path_dir: str = labels_dir_path + images_dir_name
-        csvwriter.writerow(['Games', 'Value'])  # writes down headers to csv file.
-        for file_name in os.listdir(images_path_dir):
-            if file_name.endswith(success_img_indicator):
-                label = test_labels['Success']
-                row.append(file_name)
-                row.append(label)
-            elif file_name.endswith(failure_img_indicator):
-                label = test_labels['Failed']
-                row.append(file_name)
-                row.append(label)
-            else:
-                raise RuntimeError(
-                    f'Unknown image identifier. Expected image ending with {success_img_indicator} or {failure_img_indicator}')
-            csvwriter.writerow(row)
-            row = list()
+    concat_path = labels_dir_path + labels_file_name
+    try:
+        os.chmod(concat_path, stat.S_IWUSR)
+        with open(concat_path, 'w+') as csvfile:
+            csvwriter = csv.writer(csvfile, lineterminator='\n')
+            label: int
+            row: list = list()  # row of the csv file.
+            images_path_dir: str = labels_dir_path + images_dir_name
+            csvwriter.writerow(['Games', 'Value'])  # writes down headers to csv file.
+            for file_name in os.listdir(images_path_dir):
+                if file_name.endswith(success_img_indicator):
+                    label = test_labels['Success']
+                    row.append(file_name)
+                    row.append(label)
+                elif file_name.endswith(failure_img_indicator):
+                    label = test_labels['Failed']
+                    row.append(file_name)
+                    row.append(label)
+                else:
+                    raise RuntimeError(colored(f'Unknown image identifier. Expected image ending with {success_img_indicator} or {failure_img_indicator}.', 'red'))
+                csvwriter.writerow(row)
+                row = list()
+        csvfile.close()
+        os.chmod(concat_path, stat.SF_IMMUTABLE)
+    except Exception as e:
+        print(colored(f'Error in update labels because - {e.with_traceback(None)}.', 'red'))
+        os.chmod(concat_path, stat.SF_IMMUTABLE)
 
-    csvfile.close()
-    os.chmod(labels_dir_path + labels_file_name, stat.SF_IMMUTABLE)
+
+def get_max_size(path_to_images_dir: str, is_beautiful_output: bool = True) -> tuple[int, int] | None:
+    """
+    Static function for receiving maximum image size in Image directory.
+
+    :param path_to_images_dir string path to images directory.
+    :param is_beautiful_output: beautiful values output (optional).
+    :return: tuple with (width x height).
+    """
+    _max_width: int = 0
+    _max_height: int = 0
+    try:
+        for image in os.listdir(path_to_images_dir):
+            if image.endswith(__static_pic_ext__):
+                im = Image.open(path_to_images_dir + image)
+                width, height = im.size
+                if width > _max_width:
+                    _max_width = width
+                if height > _max_height:
+                    _max_height = height
+        if is_beautiful_output:
+            print(colored(f'Maximum width of the images - "{_max_width}", Maximum height of the images - "{_max_height}".', 'blue'))
+        else:
+            return _max_width, _max_height
+    except Exception as e:
+        print(colored(f'Error in get max size of image because - {e.with_traceback(None)}.', 'red'))
+
+
+def select_terminal(items_directory_path: str) -> str | PathLike:
+    """
+    Selects item to be proceeded in neuro network.
+    :param items_directory_path: directory where you need terminal.
+    :return: path to use.
+    """
+    try:
+        if exists(items_directory_path) and len(os.listdir(items_directory_path)) != 0:
+            with os.listdir(items_directory_path) as image_dir:
+                image_counter = 0
+                items_list: list[str] = list()
+                for image in image_dir:
+                    print(f'\t №{image_counter}. {image}')
+                    items_list.append(image)
+                    image_counter += 1
+                while True:
+                    print('Select Item, enter number of item.')
+                    print(user_input_cursor, end='')
+                    user_input = int(input())
+                    if user_input.is_integer() and user_input in range(len(items_list)):
+                        return items_list[user_input]
+                    else:
+                        print(colored('Wrong argument, try again.', 'red'))
+                        continue
+    except Exception as e:
+        print(e.__cause__)
+        print(colored(f'Error occurred in Terminal function - {e.with_traceback(None)}.', 'red'))
+
+
+def input_from_user(values_range: int = None) -> int:
+    """
+    Error safety static function for input integer number from user.
+    :param values_range: accepts if inputted value in this range.
+    :return: integer number from user.
+    """
+    try:
+        print(user_input_cursor, end='')
+        user_input = int(input())
+        if values_range is not None and user_input in values_range:
+            print('Value in given range.')
+            return user_input
+        return user_input
+    except Exception as e:
+        print(e.__cause__)
+        print(colored(f'Error occurred in input_from_user function - {e.with_traceback(None)}.', 'red'))
+
+
+def user_input_with_exit(values_range: int = None) -> int | str:
+    """
+    Error safety static function for input string or integer number from user, that supports exit from loop.
+    Input value can be string or integer.
+    :param values_range: accepts if inputted value in this range.
+    :return: integer number from user or "exit" value if user wants to exit loop.
+    """
+    try:
+        print(user_input_cursor, end='')
+        user_input: int | str = input()
+        if user_input.isdigit():
+            user_input = int(user_input)
+            if values_range is not None and user_input in values_range:
+                print('Value in given range.')
+                return user_input
+            return user_input
+        else:
+            if user_input == 'exit':
+                return user_input
+    except Exception as e:
+        print(e.__cause__)
+        print(colored(f'Error occurred in input_from_user function - {e.with_traceback(None)}.', 'red'))
+
+
+def get_model_parameters(model_state_dict: dict):
+    """
+    Static function for retrieving data from model state_dict.
+    :param model_state_dict: full architecture of model, include weights and biases.
+    :return: nothing.
+    """
+    keys = model_state_dict.keys()
+    keys_length = len(keys)
+    keys_list: list = list()
+    counter: int = 0
+    func = lambda: print('Model layer:')
+    if keys_length != 0:
+        while True:
+            print('Select one value, of:')
+            print('Enter "exit" to out.')
+            func()
+            for key in keys:
+                keys_list.append(key)
+                key: str = key.replace('__model__.', '')
+                print(f'\t №{counter}. {key}')
+                if key.endswith('.bias') and len(keys_list) != keys_length:
+                    func()
+                counter += 1
+            user_input = user_input_with_exit(values_range=len(keys_list))
+            if user_input == 'exit':
+                break
+            selected_key = keys_list[user_input]
+            print(selected_key)
+            print(model_state_dict[selected_key])
+            break
+    else:
+        print(colored('Given state dict is None.', 'red'))

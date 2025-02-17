@@ -1,7 +1,7 @@
 """
 File contains some important value definitions that using in neuro network.
 RULES:
-    Do not use variables, that starts with double underscores (__) outside of this package.
+    Do not use variables, that starts and end with double underscores (__) outside of this package.
 Variables:
     save_model_dir,
     train_data_dir,
@@ -20,9 +20,11 @@ First value - width, Second value - height.
 Width x Height of the monitor.
 """
 
-dropout_rate: float = 0.001
+train_img_input_size: tuple[int, int, int, int] = (1, 1, 1705, 780)
 """
-Dropout rate of the model.
+Tuple value. Value of the input image to proceed.
+Third value - width, Fourth value - height.
+batch_size x image x Width x Height of the monitor.
 """
 
 learning_rate: float = 0.001
@@ -42,6 +44,11 @@ Cut that value in input signals.
 """
 
 __static_pic_ext__ = '.png'
+
+user_input_cursor: str = '>> '
+"""
+User input cursor used in input() function and select_terminal().
+"""
 
 success_img_indicator: str = '_startPage' + __static_pic_ext__
 failure_img_indicator: str = '_Failure' + __static_pic_ext__

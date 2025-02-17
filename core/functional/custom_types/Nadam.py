@@ -1,6 +1,7 @@
 from typing import Any
 
 import torch
+from termcolor import colored
 from torch import Tensor
 from torch.optim import Optimizer
 
@@ -31,8 +32,6 @@ class Nadam(Optimizer):
             for p in group['params']:
                 self.state[p] = dict(mom=torch.zeros_like(p.data))
 
-                # Step Method
-
     def step(self):
         for group in self.param_groups:
             for p in group['params']:
@@ -48,4 +47,4 @@ class Nadam(Optimizer):
             print('Gradients are zero now.')
         except Exception as e:
             print(e.__cause__)
-            print('Error occurred in Zero grad method in Nadam.')
+            print(colored(f'Error occurred in Zero grad method in Nadam - {e.with_traceback(None)}.', 'red'))
