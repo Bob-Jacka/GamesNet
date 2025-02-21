@@ -1,9 +1,10 @@
 from typing import Any
 
 import torch
-from termcolor import colored
 from torch import Tensor
 from torch.optim import Optimizer
+
+from core.functional.Utils import print_error
 
 
 class Nadam(Optimizer):
@@ -47,4 +48,4 @@ class Nadam(Optimizer):
             print('Gradients are zero now.')
         except Exception as e:
             print(e.__cause__)
-            print(colored(f'Error occurred in Zero grad method in Nadam - {e.with_traceback(None)}.', 'red'))
+            print_error(f'Error occurred in Zero grad method in Nadam - {e.with_traceback(None)}.')

@@ -11,6 +11,7 @@ from os.path import exists
 
 from PIL import Image
 from matplotlib import pyplot as mpl
+from matplotlib.image import imread
 from termcolor import colored
 from torch import Tensor
 from torch.utils.data import DataLoader
@@ -93,7 +94,7 @@ def proceed_image(path: str | PathLike) -> Tensor:
         return proceeded_image
     except Exception as e:
         print(e.__cause__)
-        print(colored(f'Error occurred in proceed_image function - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error occurred in proceed_image function - {e.with_traceback(None)}.')
 
 
 def get_dataloader(labels_dir_path: str | PathLike, img_dir_path: str | PathLike, batch_size=64, shuffle_sets=True) -> \
@@ -118,33 +119,31 @@ def get_dataloader(labels_dir_path: str | PathLike, img_dir_path: str | PathLike
         if train_loader is not None and test_loader is not None:
             return train_loader, test_loader
         elif train_loader is not None and test_loader is None:
-            print(colored('Be careful, only first dataloader is not None.', 'blue'))
+            print_info('Be careful, only first dataloader is not None.')
             return train_loader, None
         else:
-            print(colored('Both, train dataloader and test dataloader are None.', 'red'))
+            print_error('Both, train dataloader and test dataloader are None.')
     except RuntimeError as e:
         print(e.__cause__)
-        print(colored(f'Error in dataloader create - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error in dataloader create - {e.with_traceback(None)}.')
 
 
-def show_img(image_size: tuple[int, int] = (700, 700)):
+def show_img(path: str | PathLike, image_size: tuple[int, int] | list[int, int] = (300, 300)):
     """
     Function for showing image by matplot library.
     :return: nothing.
     """
     try:
-        figure = mpl.figure(figsize=image_size)
-        for i in range(1):
-            # sample_idx = torch.randint(len(training_data), size=(1,)).item()
-            # img, label = training_data[sample_idx] # TODO исправить значения
-            figure.add_subplot(i)
+        with open(path):
+            image = imread(path)
+            mpl.imshow(image, cmap='gray')
             mpl.title('Image')
             mpl.axis('off')
-            # plt.imshow(img.squeeze(), cmap="gray")
-        mpl.show()
+            mpl.show()
+            mpl.close()
     except Exception as e:
         print(e.__cause__)
-        print(colored(f'Error occurred in show_img function - {e.with_traceback(None)}', 'red'))
+        print_error(f'Error occurred in show_img function - {e.with_traceback(None)}.')
 
 
 test_labels: dict[str, int] = {
@@ -198,7 +197,7 @@ def update_labels(labels_dir_path: str | PathLike, images_dir_name: str = 'image
         csvfile.close()
         os.chmod(concat_path, stat.SF_IMMUTABLE)
     except Exception as e:
-        print(colored(f'Error in update labels because - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error in update labels because - {e.with_traceback(None)}.')
         os.chmod(concat_path, stat.SF_IMMUTABLE)
 
 
@@ -222,40 +221,44 @@ def get_max_size(path_to_images_dir: str, is_beautiful_output: bool = True) -> t
                 if height > _max_height:
                     _max_height = height
         if is_beautiful_output:
-            print(colored(f'Maximum width of the images - "{_max_width}", Maximum height of the images - "{_max_height}".', 'blue'))
+            print_info(f'Maximum width of the images - "{_max_width}", Maximum height of the images - "{_max_height}".')
         else:
             return _max_width, _max_height
     except Exception as e:
-        print(colored(f'Error in get max size of image because - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error in get max size of image because - {e.with_traceback(None)}.')
 
 
-def select_terminal(items_directory_path: str) -> str | PathLike:
+def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -> str | PathLike:
     """
     Selects item to be proceeded in neuro network.
+    :param is_full_path_ret: indicates if you need full path to directory or not.
     :param items_directory_path: directory where you need terminal.
     :return: path to use.
     """
     try:
-        if exists(items_directory_path) and len(os.listdir(items_directory_path)) != 0:
-            with os.listdir(items_directory_path) as image_dir:
-                image_counter = 0
-                items_list: list[str] = list()
-                for image in image_dir:
-                    print(f'\t №{image_counter}. {image}')
-                    items_list.append(image)
-                    image_counter += 1
-                while True:
-                    print('Select Item, enter number of item.')
-                    print(user_input_cursor, end='')
-                    user_input = int(input())
-                    if user_input.is_integer() and user_input in range(len(items_list)):
-                        return items_list[user_input]
+        dir_container = os.listdir(items_directory_path)
+        if exists(items_directory_path) and len(dir_container) != 0:
+            image_counter = 0
+            items_list: list[str] = list()
+            for image in dir_container:
+                print(f'\t №{image_counter}. {image}')
+                items_list.append(image)
+                image_counter += 1
+            while True:
+                print('Select Item, enter number of item.')
+                print(user_input_cursor, end='')
+                user_input = int(input())
+                if user_input.is_integer() and user_input in range(len(items_list)):
+                    if is_full_path_ret:
+                        return f'{items_directory_path}{items_list[user_input]}'
                     else:
-                        print(colored('Wrong argument, try again.', 'red'))
-                        continue
+                        return items_list[user_input]
+                else:
+                    print_error('Wrong argument, try again.')
+                    continue
     except Exception as e:
         print(e.__cause__)
-        print(colored(f'Error occurred in Terminal function - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error occurred in Terminal function - {e.with_traceback(None)}.')
 
 
 def input_from_user(values_range: int = None) -> int:
@@ -273,7 +276,7 @@ def input_from_user(values_range: int = None) -> int:
         return user_input
     except Exception as e:
         print(e.__cause__)
-        print(colored(f'Error occurred in input_from_user function - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error occurred in input_from_user function - {e.with_traceback(None)}.')
 
 
 def user_input_with_exit(values_range: int = None) -> int | str:
@@ -297,7 +300,7 @@ def user_input_with_exit(values_range: int = None) -> int | str:
                 return user_input
     except Exception as e:
         print(e.__cause__)
-        print(colored(f'Error occurred in input_from_user function - {e.with_traceback(None)}.', 'red'))
+        print_error(f'Error occurred in input_from_user function - {e.with_traceback(None)}.')
 
 
 def get_model_parameters(model_state_dict: dict):
@@ -331,4 +334,28 @@ def get_model_parameters(model_state_dict: dict):
             print(model_state_dict[selected_key])
             break
     else:
-        print(colored('Given state dict is None.', 'red'))
+        print_error('Given state dict is None.')
+
+
+def print_error(msg: str):
+    """
+    Static function for printing error with red color.
+    :param msg: message to print.
+    """
+    print(colored(msg, 'red'))
+
+
+def print_success(msg: str):
+    """
+    Static function for printing success with green color.
+    :param msg: message to print.
+    """
+    print(colored(msg, 'green'))
+
+
+def print_info(msg: str):
+    """
+    Static function for printing info messages with blue color.
+    :param msg: message to print.
+    """
+    print(colored(msg, 'blue'))
