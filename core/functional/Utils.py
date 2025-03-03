@@ -2,6 +2,7 @@
 File for some useful functions and values.
 Include settings for neuro model.
 """
+
 import csv
 import os
 import stat
@@ -22,7 +23,8 @@ from core.functional.Settings import (
     success_img_indicator,
     failure_img_indicator,
     __static_pic_ext__,
-    user_input_cursor
+    user_input_cursor,
+    test_labels
 )
 from core.functional.custom_types.GameResultsDataset import GameResultsDataset
 
@@ -81,7 +83,7 @@ class Test_results(Enum):
         return self.value
 
 
-def proceed_image(path: str | PathLike) -> Tensor:
+def proceed_image(path: str | PathLike) -> Tensor | None:
     """
     Function to proceed image with matplotlib methods.
     :return: torch tensor.
@@ -90,10 +92,9 @@ def proceed_image(path: str | PathLike) -> Tensor:
         print('Proceed image invoked.')
         image = Image.open(path)
         image.resize(input_img_size)
-        proceeded_image = transform_func_classify(image)
+        proceeded_image = transform_func_lite(image)
         return proceeded_image
     except Exception as e:
-        print(e.__cause__)
         print_error(f'Error occurred in proceed_image function - {e.with_traceback(None)}.')
 
 
@@ -124,11 +125,10 @@ def get_dataloader(labels_dir_path: str | PathLike, img_dir_path: str | PathLike
         else:
             print_error('Both, train dataloader and test dataloader are None.')
     except RuntimeError as e:
-        print(e.__cause__)
         print_error(f'Error in dataloader create - {e.with_traceback(None)}.')
 
 
-def show_img(path: str | PathLike, image_size: tuple[int, int] | list[int, int] = (300, 300)):
+def show_img(path: str | PathLike):
     """
     Function for showing image by matplot library.
     :return: nothing.
@@ -142,17 +142,7 @@ def show_img(path: str | PathLike, image_size: tuple[int, int] | list[int, int] 
             mpl.show()
             mpl.close()
     except Exception as e:
-        print(e.__cause__)
         print_error(f'Error occurred in show_img function - {e.with_traceback(None)}.')
-
-
-test_labels: dict[str, int] = {
-    'Success': 0,
-    'Failed': 1
-}
-"""
-Map of test labels.
-"""
 
 
 def update_labels(labels_dir_path: str | PathLike, images_dir_name: str = 'images',
@@ -228,9 +218,10 @@ def get_max_size(path_to_images_dir: str, is_beautiful_output: bool = True) -> t
         print_error(f'Error in get max size of image because - {e.with_traceback(None)}.')
 
 
-def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -> str | PathLike:
+def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -> str | PathLike | None:
     """
     Selects item to be proceeded in neuro network.
+    Supports "exit" directive.
     :param is_full_path_ret: indicates if you need full path to directory or not.
     :param items_directory_path: directory where you need terminal.
     :return: path to use.
@@ -247,7 +238,11 @@ def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -
             while True:
                 print('Select Item, enter number of item.')
                 print(user_input_cursor, end='')
-                user_input = int(input())
+                user_input = input()
+                if user_input == 'exit':
+                    break
+                else:
+                    user_input = int(user_input)
                 if user_input.is_integer() and user_input in range(len(items_list)):
                     if is_full_path_ret:
                         return f'{items_directory_path}{items_list[user_input]}'
@@ -257,11 +252,10 @@ def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -
                     print_error('Wrong argument, try again.')
                     continue
     except Exception as e:
-        print(e.__cause__)
         print_error(f'Error occurred in Terminal function - {e.with_traceback(None)}.')
 
 
-def input_from_user(values_range: int = None) -> int:
+def input_from_user(values_range: int = None) -> int | None:
     """
     Error safety static function for input integer number from user.
     :param values_range: accepts if inputted value in this range.
@@ -275,11 +269,10 @@ def input_from_user(values_range: int = None) -> int:
             return user_input
         return user_input
     except Exception as e:
-        print(e.__cause__)
         print_error(f'Error occurred in input_from_user function - {e.with_traceback(None)}.')
 
 
-def user_input_with_exit(values_range: int = None) -> int | str:
+def user_input_with_exit(values_range: int = None) -> int | str | None:
     """
     Error safety static function for input string or integer number from user, that supports exit from loop.
     Input value can be string or integer.
@@ -299,8 +292,26 @@ def user_input_with_exit(values_range: int = None) -> int | str:
             if user_input == 'exit':
                 return user_input
     except Exception as e:
-        print(e.__cause__)
         print_error(f'Error occurred in input_from_user function - {e.with_traceback(None)}.')
+
+
+def duo_vals_input_from_user() -> bool | None:
+    """
+    Static function for user input, supporting two variant.
+    :return: bool value, representing true or false.
+    """
+    try:
+        print(user_input_cursor, end='')
+        user_input: str = input()
+        if user_input in ('yes', 'Yes', 'Y', 'y', '1'):
+            return True
+        elif user_input in ('no', 'No', 'N', 'n', '0'):
+            return False
+        else:
+            print('Wrong argument, try again.')
+            return duo_vals_input_from_user()
+    except Exception as e:
+        print_error(f'Error occurred in duo_input_from_user function - {e.with_traceback(None)}.')
 
 
 def get_model_parameters(model_state_dict: dict):

@@ -3,13 +3,23 @@
 Entry point in this neuro network.
 This file may be used to train neuro network or some tests.
 """
+import os
 import threading
 
 from torch.utils.data import DataLoader
 
 from core.Entities.GameNet import GameNet
 from core.functional import Utils
-from core.functional.Utils import input_from_user, print_error
+from core.functional.Settings import (
+    model_name,
+    model_ext
+)
+from core.functional.Utils import (
+    input_from_user,
+    print_error,
+    print_info,
+    duo_vals_input_from_user
+)
 
 train_labels_dir_path = 'core/data/train_data/'
 test_labels_dir_path = 'core/data/validate_data/'
@@ -41,8 +51,7 @@ def init_dataloaders():
         test_dataloader = Utils.get_dataloader(labels_dir_path=f'{train_labels_dir_path}labels.csv',
                                                img_dir_path=img_dir_path_validate)
     except Exception as e:
-        print(e.__cause__)
-        print_error(f'Error in dataloaders. Dataloaders are None. - {e.with_traceback(None)}')
+        print_error(f'Error in dataloaders. Dataloaders are None. - {e.with_traceback(None)}.')
 
 
 def init_model():
@@ -51,7 +60,7 @@ def init_model():
     :return: nothing.
     """
     global model
-    model = GameNet()
+    model = GameNet(save_path=save_path)
 
 
 def result():
@@ -59,8 +68,9 @@ def result():
     Helper function for threading.
     :return: nothing.
     """
+    global model
     if model is not None:
-        model.get_result(Utils.select_terminal(img_dir_path_train))
+        model.get_result(Utils.select_terminal(img_dir_path_train, is_full_path_ret=True))
     else:
         print_error('Model is None.')
 
@@ -71,37 +81,42 @@ def model_action_menu():
     :return: nothing.
     """
     while True:
+        global model
         try:
             if model is not None:
                 print()
                 print('Select model action.')
                 print('1. Train model.')
-                print('2. Load model.')
-                print('3. Save model.')
-                print('4. Model parameters.')
-                print('5. Back.')
+                print('2. Test model.')
+                print('3. Load model.')
+                print('4. Save model.')
+                print('5. Model parameters.')
+                print('6. Back.')
                 user_input_action = input_from_user()
                 match user_input_action:
                     case 1:
-                        model.train_model(train_dataloader[0], train_epochs_count=10, after_train_save=True)
+                        model.train_model(train_dataloader[0], train_epochs_count=5, after_train_save=True, path_on_after_train=save_path)
                         continue
                     case 2:
-                        model.test_model(train_dataloader[1], test_epochs_count=10, after_test_save=True)
+                        model.test_model(train_dataloader[1], test_epochs_count=1, after_test_save=True, path_on_after_train=save_path)
                         continue
                     case 3:
-                        model.save_model(save_path, 'network', '.pth')
+                        model = GameNet.load_model(save_path, model_name, model_ext)
                         continue
                     case 4:
-                        Utils.get_model_parameters(model.state_dict())
+                        GameNet.save_model(save_path, model, model_name, model_ext)
                         continue
                     case 5:
+                        Utils.get_model_parameters(model.state_dict())
+                        continue
+                    case 6:
                         break
                     case _:
-                        print('Wrong argument. Try again.')
+                        print_error('Wrong argument. Try again.')
+                        continue
             else:
                 print('Create model first.')
         except Exception as e:
-            print(e.__cause__)
             print_error(f'Error occurred in labels function - {e.with_traceback(None)}.')
 
 
@@ -131,16 +146,28 @@ def labels_menu():
                     print_error('Wrong argument. Try again.')
                     continue
         except Exception as e:
-            print(e.__cause__)
             print_error(f'Error occurred in labels function - {e.with_traceback(None)}.')
 
 
 if __name__ == '__main__':
-    dataloaders_thread = threading.Thread(target=init_dataloaders())
-    dataloaders_thread.run()
+    init_dataloaders_script = lambda: threading.Thread(target=init_dataloaders()).run()
+    init_model_script = lambda: threading.Thread(target=init_model()).run()
 
-    init_model_thread = threading.Thread(target=init_model())
-    init_model_thread.run()
+    if len(os.listdir(save_path)) == 0:
+        init_dataloaders_script()
+        init_model_script()
+    else:
+        print_info('Save directory is not empty, you may load model, instead of using not trained.')
+        print_info('Do you want to load model, y / n.')
+        res = duo_vals_input_from_user()
+        match res:
+            case True:
+                init_dataloaders_script()
+                model = GameNet.load_model(save_path, model_name, model_ext)
+            case False:
+                init_dataloaders_script()
+                init_model_script()
+
     while True:
         print()
         print('\t Main menu')
@@ -175,5 +202,4 @@ if __name__ == '__main__':
                     print_error('Wrong argument.')
                     continue
         except Exception as e:
-            print(e.__cause__)
             print_error(f'Error in user input - {e.with_traceback(None)}.')

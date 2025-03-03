@@ -1,16 +1,16 @@
 GameNet architecture:
                                          Optimizer
                                              |
-                                       ____GameNet________________________________________
-                                      /      |        \                 \                 \
-                        1_Neuro_block  2_Neuro_block  3_Neuro_block     4_Neuro_block     Result_layer
-                               |             |           |                     |              |
-                             conv2d       conv2d       conv2d               linear         softmax
+             ______________________________GameNet______________________________________________
+            /                         /      |                        \           |             \
+        input_layer         1_Neuro_block  2_Neuro_block     3_Neuro_block   4_Neuro_block     Result_layer
+            |                   |             |                        |           |               |
+         conv2d               conv2d       conv2d                    linear      linear          softmax
 
 
 Infrastructure architecture:
                                         Main func - entry point to program
-                                            |
+                                             |
                               ___________Main cycle_____________________________
                              /           |                  |                   \
                         result     Model_action...     Update_labels...       Get_max_size_of_image
@@ -18,4 +18,5 @@ Infrastructure architecture:
                             train load save  parameters   train    test
 
 
-'{A-Za-z}...' - this name means nested menu.
+
+*'{A-Za-z}...' - this name means nested menu.

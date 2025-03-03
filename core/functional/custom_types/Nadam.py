@@ -47,5 +47,4 @@ class Nadam(Optimizer):
             super().zero_grad(set_to_none)
             print('Gradients are zero now.')
         except Exception as e:
-            print(e.__cause__)
             print_error(f'Error occurred in Zero grad method in Nadam - {e.with_traceback(None)}.')

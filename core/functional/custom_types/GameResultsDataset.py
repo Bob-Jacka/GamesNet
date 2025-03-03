@@ -38,11 +38,10 @@ class GameResultsDataset(Dataset):
             self.transform = transform
             self.target_transform = target_transform
         except Exception as e:
-            print(e.__cause__)
             print(e.with_traceback(None))
             print_error("An error occurred in init custom game results dataset.")
 
-    def __add__(self, other: "Dataset[_T_co]") -> "ConcatDataset[_T_co]":
+    def __add__(self, other: "Dataset[_T_co]") -> ConcatDataset[_T_co] | None:
         """
         Method for adding dataset in inner structure.
         :param other: Object to add.
