@@ -1,5 +1,8 @@
 from collections import OrderedDict
-from typing import Iterator, Literal
+from typing import (
+    Iterator,
+    Literal
+)
 
 from torch import Tensor
 from torch.nn import (
@@ -10,13 +13,18 @@ from torch.nn import (
     MaxPool2d,
     Dropout2d,
     Parameter,
-    Module, Sigmoid, Flatten
+    Module,
+    Sigmoid,
+    Flatten
 )
 
 from core.functional.Settings import (
     leaky_relu_value,
 )
-from core.functional.Utils import print_error, print_success
+from core.functional.Utils import (
+    print_error,
+    print_success
+)
 
 
 class Neuro_block(Module):
@@ -67,20 +75,15 @@ class Neuro_block(Module):
         match class_to_create:
             case 'Conv2d':
                 self.__create_conv_layer__(
-                    input_count=sizes[0],
-                    output_count=sizes[1],
-                    kernel_size=kernel_size,
-                    padding=padding,
-                    stride=stride,
-                    bias=bias,
+                    input_count=sizes[0], output_count=sizes[1],
+                    kernel_size=kernel_size, padding=padding,
+                    stride=stride, bias=bias,
                     dropout_rate=input_dropout_rate
                 )
             case 'Linear':
                 self.__create_linear_layer__(
-                    input_count=sizes[0],
-                    output_count=sizes[1],
-                    dropout_rate=input_dropout_rate,
-                    bias=bias,
+                    input_count=sizes[0], output_count=sizes[1],
+                    dropout_rate=input_dropout_rate, bias=bias,
                 )
             case 'Flatten':
                 self.__create_flatten_layer__(
@@ -103,8 +106,8 @@ class Neuro_block(Module):
         """
         self.inner_structure = Sequential(
             OrderedDict([
-                ('input_conv', Conv2d(in_channels=input_count, out_channels=output_count, kernel_size=kernel_size, padding=padding, stride=stride, bias=bias)),
-                ('l_relu', LeakyReLU(leaky_relu_value)),
+                ('conv_layer', Conv2d(in_channels=input_count, out_channels=output_count, kernel_size=kernel_size, padding=padding, stride=stride, bias=bias)),
+                ('activation_func', LeakyReLU(leaky_relu_value)),
                 ('maxPool_layer', MaxPool2d(kernel_size=kernel_size, stride=stride)),
                 ('drop_layer', Dropout2d(p=dropout_rate))
             ])
@@ -123,7 +126,7 @@ class Neuro_block(Module):
         """
         self.inner_structure = Sequential(
             OrderedDict([
-                ('linear', Linear(input_count, output_count, bias=bias)),
+                ('linear_layer', Linear(input_count, output_count, bias=bias)),
                 ('activation_func', Sigmoid()),
                 ('drop_layer', Dropout2d(p=dropout_rate)),
             ]),
@@ -133,7 +136,7 @@ class Neuro_block(Module):
     def __create_flatten_layer__(self, dropout_rate: float, start_dim: int, end_dim: int):
         self.inner_structure = Sequential(
             OrderedDict([
-                ('flatten', Flatten(start_dim, end_dim)),
+                ('flatten_layer', Flatten(start_dim, end_dim)),
                 ('activation_func', Sigmoid()),
                 ('drop_layer', Dropout2d(p=dropout_rate))
             ])

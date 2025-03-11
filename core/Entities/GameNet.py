@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import datetime
 from inspect import Parameter
 from typing import Iterator
 
@@ -30,17 +31,17 @@ class GameNet(nn.Module):
 
     __model__: Module
     """
-    Instance of neuro model.
+    Private instance of neuro model.
     """
 
     __optimizer__: Optimizer
     """
-    Instance of optimizer, ex.Adam, Nadam.
+    Private instance of optimizer, ex.Adam, Nadam.
     """
 
-    __loss_fn__: BCELoss
+    __loss_fn__: _Loss
     """
-    Instance of loss function.
+    Private instance of loss function.
     """
 
     def __init__(self, is_already_trained: bool = False, *args, **kwargs):
@@ -88,15 +89,15 @@ class GameNet(nn.Module):
         try:
             if exists(load_path) and len(os.listdir(load_path)) != 0:
                 if ext.startswith('.'):
-                    state_dict = torch.load(load_path + model_name_to_load + ext, weights_only=True)
-                    loaded_model = GameNet(save_path='')
+                    state_dict = torch.load(load_path + model_name_to_load + ext, weights_only=False) # Было True
+                    loaded_model = GameNet()
                     if 'module.' in next(iter(state_dict.keys())):
                         state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
                     loaded_model.load_state_dict(state_dict, strict=False)
-                    print_error("Model loaded and ready.")
+                    print_error('Model loaded and ready.')
                     return loaded_model
             else:
-                print_error("Model is not exist.")
+                print_error('Model is not exist.')
         except Exception as e:
             print_error(f'Error occurred during model loading. - {e.with_traceback(None)}.')
 
@@ -133,7 +134,7 @@ class GameNet(nn.Module):
     def get_result(self, input_img: str | PathLike, is_str_output: bool = False) -> str | None:
         """
         Method for get result of the test classify process.
-        :param is_str_output: value representing need of output value.
+        :param is_str_output: value that representing need in output value.
         :param input_img path to image to proceed by model.
         :return: 'success' for successful test, 'failed' for failed test, 'skip' for skipped test.
         """
@@ -143,42 +144,43 @@ class GameNet(nn.Module):
                 tensor_img = Utils.proceed_image(input_img)
                 model_output = self.__model__(tensor_img)
                 predicted = torch.max(model_output.data, 1).values
-                res = __get_min_and_max__(predicted)
+                result = __get_min_and_max__(predicted)
                 if is_str_output:
-                    return f'Probability of success is {res[0]}%, probability of failure is {res[1]}%'
+                    return f'Probability of success is {result[0]}%, probability of failure is {result[1]}%'
                 else:
-                    print_success(f'Probability of success is {res[0]}%, probability of failure is {res[1]}%')
+                    print_success(f'Probability of success is {result[0]}%, probability of failure is {result[1]}%')
         except Exception as e:
             print_error(f'Error occurred during model result prediction - {e.with_traceback(None)}.')
 
     def train_model(self, train_data_loader: DataLoader, train_epochs_count: int = 40, after_train_save: bool = False, path_on_after_train: str | PathLike = ''):
         """
         Method for training model on images during epoch_count.
-        :param path_on_after_train:
+        Include execution timer.
         :param train_data_loader: object for storing data.
         :param train_epochs_count: count of epoch to train the model.
         :param after_train_save: bool value represent needs of saving the model after train.
+        :param path_on_after_train: path on which will model saved.
         :return: nothing.
         """
         try:
             self.__model__.train()
-            print('Training start:')
+            start_train = datetime.now()
+            print_info(f'Training start at - {start_train}.')
             epoch_count = range(0, train_epochs_count)
             for epoch in epoch_count:
                 running_loss: float = 0.0
                 for images, labels in train_data_loader:
                     images, labels = images.to(device), labels.to(device)
                     for image in images:
-                        self.__optimizer__.zero_grad()
-                        outputs = self.__model__(image)
-                        # loss = self.__loss_fn__(outputs, labels)  # TODO. !!! По прежнему будет ошибка в обратном распространении градиента
-                        # loss.backward()
-                        self.__optimizer__.step()
-                        # running_loss += loss.item()
-                    print(f'Current train epoch - №{epoch + 1} of {epoch_count.stop}\'s, Loss: {running_loss / len(train_data_loader):.4f}.')
+                        running_loss = self.__neuro_learn__(image, labels, running_loss) # TODO. !!! По прежнему будет ошибка в обратном распространении градиента
+                    print_info(f'Current train epoch - №{epoch + 1} of {epoch_count.stop}\'s, Loss: {running_loss / len(train_data_loader):.4f}.')
             if after_train_save:
                 print_success('After train save occurred.')
                 GameNet.save_model(path_on_after_train, __model__=self.__model__)
+            train_end = datetime.now()
+            print_info(f'Training end at - {train_end}.')
+            self.__model__.eval()  # switch neuro model back to the eval mode.
+            self.__execution_time__(start_train, train_end)
         except Exception as e:
             e.add_note('Game net class - train_model method.')
             print_error(f'Error occurred during model training. - {e.with_traceback(None)}.')
@@ -189,33 +191,61 @@ class GameNet(nn.Module):
         :param test_data_loader: object for storing data.
         :param test_epochs_count: count of epoch to test the model.
         :param after_test_save: bool value represent needs of saving the model after test.
+        :param path_on_after_test: bool value represent needs of saving the model after train.
         :return: nothing.
         """
         try:
             self.__model__.eval()
-            print('Testing start:')
+            print_info('Testing start:')
+            start_time = datetime.now()
             for epoch in range(test_epochs_count):
                 running_loss: float = 0.0
                 for images, labels in test_data_loader:
                     images, labels = images.to(device), labels.to(device)
                     for image in images:
-                        self.__optimizer__.zero_grad()
-                        outputs = self.__model__(image)
-                        loss = self.__loss_fn__(outputs, labels)
-                        loss.backward()
-                        self.__optimizer__.step()
-                        running_loss += loss.item()
-                    print(f'Current test epoch - №{epoch + 1} of {epoch}\'s, Loss: {running_loss / len(test_data_loader):.4f}.')
+                        running_loss = self.__neuro_learn__(image, labels, running_loss)
+                    print_info(f'Current test epoch - №{epoch + 1} of {epoch}\'s, Loss: {running_loss / len(test_data_loader):.4f}.')
             if after_test_save:
                 print_error('After test save occurred.')
                 GameNet.save_model(path_on_after_test, __model__=self.__model__)
+            end_time = datetime.now()
+            self.__execution_time__(start_time, end_time)
         except Exception as e:
             e.add_note('Game net class - test_model method.')
             print_error(f'Error occurred during model testing. - {e.with_traceback(None)}.')
 
-    def create_optim(self, manual_create: bool = False):
+    def __neuro_learn__(self, image, labels, running_loss: float) -> float:
         """
-        :param manual_create: represents manual creation with loss function selection.
+        Private inner logic of neuro learning.
+        :param image: Image instance to proceed.
+        :param labels: Labels of identifiers.
+        :param running_loss: Loss value of model.
+        :return: Updated running_loss value of model.
+        """
+        self.__optimizer__.zero_grad()
+        outputs = self.__model__(image)
+        print(datetime.now())
+        loss = self.__loss_fn__(outputs, labels)
+        loss.backward()
+        self.__optimizer__.step()
+        running_loss += loss.item()
+        return running_loss
+
+    @staticmethod
+    def __execution_time__(start_time: datetime, end_time: datetime):
+        """
+        Private static function for show how much time spent on training or test.
+        :param start_time: test or train start execution time.
+        :param end_time: test or train end execution time.
+        """
+        difference = end_time - start_time
+        seconds_in_day = 24 * 60 * 60
+        train_time = divmod(difference.days * seconds_in_day + difference.seconds, 60)
+        print_info(f'Training has taken - {train_time[0]} minutes and {train_time[1]} seconds.')
+
+    def create_optim(self, is_manual_create: bool = False):
+        """
+        :param is_manual_create: represents manual creation with loss function selection.
         None safety method to create optimizer and loss function.
         :return: nothing.
         """
@@ -223,7 +253,7 @@ class GameNet(nn.Module):
             if self.__model__ is not None:
                 parameters: Iterator[Parameter] = self.__model__.parameters(recurse=True)
                 if parameters is not None:
-                    if not manual_create:
+                    if not is_manual_create:
                         self.__optimizer__ = torch.optim.Adam(self.__model__.parameters(), lr=learning_rate)  # TODO в будущем заменить на Nadam.
                         self.__loss_fn__: _Loss = BCELoss()
                         print_success('Default optimizer created.')
@@ -231,7 +261,7 @@ class GameNet(nn.Module):
                         counter = 0
                         for optim in optimizers:
                             print(f'№{counter}. {optim}')
-                        user_choice = input_from_user(len(optimizers))
+                        user_choice = int_input_from_user(len(optimizers))
                         returned: str = optimizers[user_choice]
                         match returned:
                             case 'MSELoss':
@@ -247,7 +277,7 @@ class GameNet(nn.Module):
                             case 'NLLLoss':
                                 self.__loss_fn__ = NLLLoss()
                             case _:
-                                print(f'Wrong type. Expected - {optimizers}, got {returned} instead.')
+                                print_error(f'Wrong type. Expected - {optimizers}, got {returned} instead.')
                         print_success('Optimizer created.')
                 else:
                     print_error('Optimizer cannot created. Because parameters of model is None.')

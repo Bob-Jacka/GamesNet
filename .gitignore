@@ -1,0 +1,3 @@
+/core/save_model/*
+/core/data/train_data/images/*.png
+/core/data/validate_data/images/*.png

@@ -3,9 +3,11 @@
 Entry point in this neuro network.
 This file may be used to train neuro network or some tests.
 """
+
 import os
 import threading
 
+from torch.nn import Module
 from torch.utils.data import DataLoader
 
 from core.Entities.GameNet import GameNet
@@ -15,7 +17,7 @@ from core.functional.Settings import (
     model_ext
 )
 from core.functional.Utils import (
-    input_from_user,
+    int_input_from_user,
     print_error,
     print_info,
     duo_vals_input_from_user
@@ -32,16 +34,16 @@ save_path = 'core/save_model/'
 train_dataloader: tuple[DataLoader, DataLoader | None] | None
 test_dataloader: tuple[DataLoader, DataLoader | None] | None
 
-model: GameNet
+model: GameNet | Module
 """
 Global instance of model.
 """
 
 
-def init_dataloaders():
+def __init_dataloaders__():
     """
-    Helper function for threading.
-    :return: nothing.
+    Private helper function for threading.
+    :return: in global statements dataloader will be initialized.
     """
     global train_dataloader, test_dataloader
     try:
@@ -54,18 +56,18 @@ def init_dataloaders():
         print_error(f'Error in dataloaders. Dataloaders are None. - {e.with_traceback(None)}.')
 
 
-def init_model():
+def __init_model__():
     """
-    Helper function for threading.
+    Private helper function for threading.
     :return: nothing.
     """
     global model
-    model = GameNet(save_path=save_path)
+    model = GameNet()
 
 
-def result():
+def __result__():
     """
-    Helper function for threading.
+    Private helper function for threading.
     :return: nothing.
     """
     global model
@@ -77,7 +79,7 @@ def result():
 
 def model_action_menu():
     """
-    Helper function for model actions.
+    Private helper function for model actions.
     :return: nothing.
     """
     while True:
@@ -86,19 +88,31 @@ def model_action_menu():
             if model is not None:
                 print()
                 print('Select model action.')
-                print('1. Train model.')
-                print('2. Test model.')
-                print('3. Load model.')
-                print('4. Save model.')
-                print('5. Model parameters.')
-                print('6. Back.')
-                user_input_action = input_from_user()
+                print('1. Train model,')
+                print('2. Test model,')
+                print('3. Load model,')
+                print('4. Save model,')
+                print('5. Model parameters,')
+                print('6. Model weights,')
+                print('7. Disable model,')
+                print('8. Back.')
+                user_input_action = int_input_from_user(7)
                 match user_input_action:
                     case 1:
-                        model.train_model(train_dataloader[0], train_epochs_count=5, after_train_save=True, path_on_after_train=save_path)
+                        model.train_model(
+                            train_dataloader[0],
+                            train_epochs_count=Utils.int_input_from_user(values_range=2, topic='Enter value of epochs to train'),
+                            after_train_save=True,
+                            path_on_after_train=save_path
+                        )
                         continue
                     case 2:
-                        model.test_model(train_dataloader[1], test_epochs_count=1, after_test_save=True, path_on_after_train=save_path)
+                        model.test_model(
+                            train_dataloader[1],
+                            test_epochs_count=Utils.int_input_from_user(values_range=2, topic='Enter value of epochs to test'),
+                            after_test_save=True,
+                            path_on_after_test=save_path
+                        )
                         continue
                     case 3:
                         model = GameNet.load_model(save_path, model_name, model_ext)
@@ -110,6 +124,12 @@ def model_action_menu():
                         Utils.get_model_parameters(model.state_dict())
                         continue
                     case 6:
+                        Utils.get_model_weight(model.state_dict())
+                        continue
+                    case 7:
+                        model = None
+                        continue
+                    case 8:
                         break
                     case _:
                         print_error('Wrong argument. Try again.')
@@ -122,17 +142,18 @@ def model_action_menu():
 
 def labels_menu():
     """
-    Helper function.
+    Private helper menu function.
     :return: nothing.
     """
     while True:
         try:
             print()
-            print('Select which labels to update.')
-            print('1. Train labels.')
-            print('2. Test labels.')
-            print('3. Back.')
-            user_input_labels = input_from_user()
+            print('Select labels action')
+            print('1. Update - Train labels.')
+            print('2. Update - Test labels.')
+            print('3. Change labels identifiers.')
+            print('4. Back.')
+            user_input_labels = int_input_from_user(4)
             match user_input_labels:
                 case 1:
                     Utils.update_labels(train_labels_dir_path)
@@ -141,6 +162,13 @@ def labels_menu():
                     Utils.update_labels(test_labels_dir_path)
                     continue
                 case 3:
+                    Utils.change_labels(
+                        new_label_str=Utils.str_input_from_user(topic='Enter new labels name.'),
+                        old_label_str=Utils.str_input_from_user(topic='Enter old labels name.'),
+                        labels_dir_path=train_labels_dir_path
+                    )
+                    continue
+                case 4:
                     break
                 case _:
                     print_error('Wrong argument. Try again.')
@@ -150,8 +178,8 @@ def labels_menu():
 
 
 if __name__ == '__main__':
-    init_dataloaders_script = lambda: threading.Thread(target=init_dataloaders()).run()
-    init_model_script = lambda: threading.Thread(target=init_model()).run()
+    init_dataloaders_script = lambda: threading.Thread(target=__init_dataloaders__()).run()
+    init_model_script = lambda: threading.Thread(target=__init_model__()).run()
 
     if len(os.listdir(save_path)) == 0:
         init_dataloaders_script()
@@ -168,20 +196,22 @@ if __name__ == '__main__':
                 init_dataloaders_script()
                 init_model_script()
 
+    # Main action cycle
     while True:
-        print()
+        print('... - Means nested menu.')
+        print('!!! Exit from program will not save neuro model.')
         print('\t Main menu')
         print('1. Get result,')
         print('2. Model action...,')
-        print('3. Update labels...,')
+        print('3. Labels action...,')
         print('4. Get max size of image,')
-        print('5. See train images,')
+        print('5. See train image,')
         print('6. Exit program.')
-        user_input = input_from_user()
+        user_input = Utils.int_input_from_user()
         try:
             match user_input:
                 case 1:
-                    result()
+                    __result__()
                     continue
                 case 2:
                     model_action_menu()

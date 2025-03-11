@@ -31,12 +31,6 @@ Used for leaky_relu components of neuro net.
 Cut that value in input signals.
 """
 
-__static_pic_ext__ = '.png'
-"""
-Image extension.
-Because train and test images captured by "windows print screen" function static picture extension is .png and not .jpeg instead.
-"""
-
 user_input_cursor: str = '>> '
 """
 User input cursor used in input() function and select_terminal().
@@ -52,25 +46,34 @@ model_ext: Literal['.pth', '.pt', '.pwf'] = '.pth'
 Global model extension of the file.
 """
 
-success_img_indicator: str = '_startPage' + __static_pic_ext__
-"""
-Representing success image result, which will be used in update labels function.
-"""
-
-failure_img_indicator: str = '_failure' + __static_pic_ext__
-"""
-Representing failure image result, which will be used in update labels function.
-"""
-
-test_labels: dict[str, int] = {
-    'Success': 0,
-    'Failed': 1
-}
-"""
-Map of test labels.
-"""
-
 optimizers: tuple = ('MSELoss', 'L1Loss', 'BCELoss', 'BCEWithLogitsLoss', 'CrossEntropyLoss', 'NLLLoss')
 """
 Optimizer names.
 """
+
+########################################### Results of the test ###################################################
+
+__static_pic_ext__ = '.png'
+"""
+Image extension.
+Because train and test images captured by "windows print screen" function static picture extension is .png and not .jpeg instead.
+"""
+
+success_img_indicator: str = '_action' + __static_pic_ext__
+"""
+Representing success image result, which will be used in update labels function in Utils.
+"""
+
+failure_img_indicator: str = '_noAction' + __static_pic_ext__
+"""
+Representing failure image result, which will be used in update labels function in Utils.
+"""
+
+test_labels: dict[str, int] = {
+    'Success': 1,
+    'Failed': 0
+}
+"""
+Map of test labels.
+"""
+###################################################################################################################

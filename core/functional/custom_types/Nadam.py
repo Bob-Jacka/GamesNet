@@ -1,3 +1,7 @@
+"""
+Next Adam optimizer.
+"""
+
 from typing import Any
 
 import torch

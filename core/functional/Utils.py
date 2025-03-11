@@ -6,7 +6,6 @@ Include settings for neuro model.
 import csv
 import os
 import stat
-from enum import Enum
 from os import PathLike
 from os.path import exists
 
@@ -67,22 +66,6 @@ Performs lite number of transformation. Same as classify transformations, but fo
 """
 
 
-class Test_results(Enum):
-    """
-    Enum class for storing results for test.
-    """
-    SUCCESS = 'Success',
-    FAILED = 'Fail',
-    SKIPPED = 'Skip'
-
-    def get_value(self):
-        """
-        Method for receiving value of enum object.
-        :return: string value of enum object.
-        """
-        return self.value
-
-
 def proceed_image(path: str | PathLike) -> Tensor | None:
     """
     Function to proceed image with matplotlib methods.
@@ -137,7 +120,7 @@ def show_img(path: str | PathLike):
         with open(path):
             image = imread(path)
             mpl.imshow(image, cmap='gray')
-            mpl.title('Image')
+            mpl.title('Image view')
             mpl.axis('off')
             mpl.show()
             mpl.close()
@@ -151,71 +134,94 @@ def update_labels(labels_dir_path: str | PathLike, images_dir_name: str = 'image
     Static function for updating labels in csv file.
     Opens file if it exits or creates new file if it not and then rewritten (written) data to file on every call.
     Before every call unlocks file for writing, after every call locks file for writing.
-
     RULES:
         1. Images names must ends with {success_img_indicator} or {failure_img_indicator}.
         2. labels_file_name must include '.csv' extension.
         3. labels_dir_path must fill out in main.py file.
-
     :param labels_dir_path path where labels are stored.
     :param images_dir_name path where images are stored.
     :param labels_file_name: name of the labels file.
     :return: None.
     """
-    concat_path = labels_dir_path + labels_file_name
+    full_path = labels_dir_path + labels_file_name
     try:
-        os.chmod(concat_path, stat.S_IWUSR)
-        with open(concat_path, 'w+') as csvfile:
+        os.chmod(full_path, stat.S_IWUSR)
+        with open(full_path, 'w+') as csvfile:
             csvwriter = csv.writer(csvfile, lineterminator='\n')
-            label: int
             row: list = list()  # row of the csv file.
             images_path_dir: str = labels_dir_path + images_dir_name
             csvwriter.writerow(['Games', 'Value'])  # writes down headers to csv file.
             for file_name in os.listdir(images_path_dir):
                 if file_name.endswith(success_img_indicator):
-                    label = test_labels['Success']
+                    label = test_labels['Success']  # 1 - value for success.
                     row.append(file_name)
                     row.append(label)
                 elif file_name.endswith(failure_img_indicator):
-                    label = test_labels['Failed']
+                    label = test_labels['Failed']  # 0 - value for failure.
                     row.append(file_name)
                     row.append(label)
                 else:
-                    raise RuntimeError(colored(f'Unknown image identifier. Expected image ending with {success_img_indicator} or {failure_img_indicator}.', 'red'))
+                    print_error(f'Unknown image identifier. Expected image ending with - {success_img_indicator} or {failure_img_indicator}.')
                 csvwriter.writerow(row)
                 row = list()
+        print_success('Labels have been updated.')
+        print_success('Exit program to update file view.')
         csvfile.close()
-        os.chmod(concat_path, stat.SF_IMMUTABLE)
+        os.chmod(full_path, stat.SF_IMMUTABLE)
     except Exception as e:
         print_error(f'Error in update labels because - {e.with_traceback(None)}.')
-        os.chmod(concat_path, stat.SF_IMMUTABLE)
+        os.chmod(full_path, stat.SF_IMMUTABLE)
+
+
+def change_labels(new_label_str: str, labels_dir_path: str | PathLike, old_label_str: str = None, images_dir_name: str = 'images'):
+    """
+    Experimental feature.
+    :param new_label_str: new string filename ending.
+    :param labels_dir_path: path to the directory where contains images to change.
+    :param images_dir_name: *optional argument. name of the directory where contains images.
+    :param old_label_str: *optional argument. old name of the labels.
+    Static function for changing labels identifiers in images.
+    """
+    full_path_to_dir = labels_dir_path + images_dir_name + '/'  # full path to directory with images.
+    files: list[str] = os.listdir(full_path_to_dir)
+    try:
+        for file_name in files:
+            new_name: str = file_name.replace(old_label_str, new_label_str)  # new name with replaced string.
+            new_full_path_to_dir_and_name = full_path_to_dir + new_name
+            print(f'Change from {full_path_to_dir + file_name} to {new_full_path_to_dir_and_name}.')
+            os.rename(full_path_to_dir + file_name, new_full_path_to_dir_and_name)
+        print('Labels identifiers changed.')
+    except Exception as e:
+        print(f'Error occurred in change_labels function - {e.with_traceback(None)}.')
 
 
 def get_max_size(path_to_images_dir: str, is_beautiful_output: bool = True) -> tuple[int, int] | None:
     """
     Static function for receiving maximum image size in Image directory.
-
     :param path_to_images_dir string path to images directory.
     :param is_beautiful_output: beautiful values output (optional).
     :return: tuple with (width x height).
     """
     _max_width: int = 0
     _max_height: int = 0
-    try:
-        for image in os.listdir(path_to_images_dir):
-            if image.endswith(__static_pic_ext__):
-                im = Image.open(path_to_images_dir + image)
-                width, height = im.size
-                if width > _max_width:
-                    _max_width = width
-                if height > _max_height:
-                    _max_height = height
-        if is_beautiful_output:
-            print_info(f'Maximum width of the images - "{_max_width}", Maximum height of the images - "{_max_height}".')
-        else:
-            return _max_width, _max_height
-    except Exception as e:
-        print_error(f'Error in get max size of image because - {e.with_traceback(None)}.')
+    if path_to_images_dir.endswith('/'):
+        try:
+            for image in os.listdir(path_to_images_dir):
+                if image.endswith(__static_pic_ext__):
+                    im = Image.open(path_to_images_dir + image)
+                    width, height = im.size
+                    if width > _max_width:
+                        _max_width = width
+                    if height > _max_height:
+                        _max_height = height
+            if is_beautiful_output:
+                print_info(f'Maximum width of the images - "{_max_width}", Maximum height of the images - "{_max_height}".')
+            else:
+                return _max_width, _max_height
+        except Exception as e:
+            print_error(f'Error in get max size of image because - {e.with_traceback(None)}.')
+    else:
+        print_error('Wrong path ending, expected / end.')
 
 
 def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -> str | PathLike | None:
@@ -227,19 +233,22 @@ def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -
     :return: path to use.
     """
     try:
+        no_column_print = lambda img_counter, img_name: print(f'\t №{img_counter}. {img_name}')
+
         dir_container = os.listdir(items_directory_path)
         if exists(items_directory_path) and len(dir_container) != 0:
             image_counter = 0
             items_list: list[str] = list()
             for image in dir_container:
-                print(f'\t №{image_counter}. {image}')
+                no_column_print(img_counter=image_counter, img_name=image)
                 items_list.append(image)
                 image_counter += 1
             while True:
-                print('Select Item, enter number of item.')
+                print('Enter "exit" to break loop.')
+                print('Select Item -> enter number of item.')
                 print(user_input_cursor, end='')
                 user_input = input()
-                if user_input == 'exit':
+                if user_input == 'exit' and not user_input.isdigit():
                     break
                 else:
                     user_input = int(user_input)
@@ -255,21 +264,42 @@ def select_terminal(items_directory_path: str, is_full_path_ret: bool = False) -
         print_error(f'Error occurred in Terminal function - {e.with_traceback(None)}.')
 
 
-def input_from_user(values_range: int = None) -> int | None:
+def int_input_from_user(values_range=None, topic: str = '') -> int | None:
     """
     Error safety static function for input integer number from user.
     :param values_range: accepts if inputted value in this range.
+    :param topic: *optional argument.
     :return: integer number from user.
     """
     try:
+        if topic != '':
+            print(topic)
         print(user_input_cursor, end='')
         user_input = int(input())
-        if values_range is not None and user_input in values_range:
-            print('Value in given range.')
-            return user_input
+        if values_range is not None:
+            if user_input in range(values_range):
+                print('Value in given range.')
+                return user_input
         return user_input
     except Exception as e:
-        print_error(f'Error occurred in input_from_user function - {e.with_traceback(None)}.')
+        print_error(f'Error occurred in int_input_from_user function - {e.with_traceback(None)}.')
+
+
+def str_input_from_user(topic: str = '') -> str | None:
+    """
+    Error safety static function for input string from user.
+    :param topic: *optional argument.
+    :return: string from user input or "None" if error occurred.
+    """
+    try:
+        if topic != '':
+            print(topic)
+        print(user_input_cursor, end='')
+        user_input = str(input())
+        if not user_input.isnumeric() and not user_input.isspace():
+            return user_input
+    except Exception as e:
+        print_error(f'Error occurred in str_input_from_user function - {e.with_traceback(None)}.')
 
 
 def user_input_with_exit(values_range: int = None) -> int | str | None:
@@ -346,6 +376,17 @@ def get_model_parameters(model_state_dict: dict):
             break
     else:
         print_error('Given state dict is None.')
+
+
+def get_model_weight(model_state_dict: dict):
+    """
+    Static function for getting model weights.
+    :param model_state_dict: full architecture of model, include weights and biases.
+    :return: nothing.
+    """
+    keys = [x for x in model_state_dict.keys() if x.endswith(".weight")]
+    for key in keys:
+        print(f'\t{model_state_dict[key]}')
 
 
 def print_error(msg: str):
