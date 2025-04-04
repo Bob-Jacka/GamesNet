@@ -62,7 +62,7 @@ class Neuro_block(Module):
         :param sizes: 2 value tuple, where first element is width of image and second value is height.
         :param input_dropout_rate: values in tensors with this float number will be cut off.
         :param kernel_size: size of window to compute. By default, equals 3.
-        :param: padding:
+        :param: padding: shift of the kernel window.
         :param class_to_create torch classes of models to create, can be one of ... .
         :param args: parameters for super constructor.
         :param kwargs: parameters for super constructor.
@@ -141,6 +141,7 @@ class Neuro_block(Module):
                 ('drop_layer', Dropout2d(p=dropout_rate))
             ])
         )
+        print_success('Flatten network created.')
 
     def get_parameters(self) -> Iterator[Parameter]:
         """

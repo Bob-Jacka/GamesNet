@@ -89,7 +89,7 @@ class GameNet(nn.Module):
         try:
             if exists(load_path) and len(os.listdir(load_path)) != 0:
                 if ext.startswith('.'):
-                    state_dict = torch.load(load_path + model_name_to_load + ext, weights_only=False) # Было True
+                    state_dict = torch.load(load_path + model_name_to_load + ext, weights_only=False)  # Было True
                     loaded_model = GameNet()
                     if 'module.' in next(iter(state_dict.keys())):
                         state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
@@ -123,13 +123,13 @@ class GameNet(nn.Module):
         except Exception as e:
             print_error(f'Error occurred during model saving. - {e.with_traceback(None)}.')
 
-    def forward(self, X):
+    def forward(self, x):
         """
         Inner method of neuro model.
-        :param X: input information tensor.
+        :param x: input information tensor.
         :return: result of the model action.
         """
-        return self.model(X)
+        return self.model(x)
 
     def get_result(self, input_img: str | PathLike, is_str_output: bool = False) -> str | None:
         """
@@ -152,7 +152,7 @@ class GameNet(nn.Module):
         except Exception as e:
             print_error(f'Error occurred during model result prediction - {e.with_traceback(None)}.')
 
-    def train_model(self, train_data_loader: DataLoader, train_epochs_count: int = 40, after_train_save: bool = False, path_on_after_train: str | PathLike = ''):
+    def train_model(self, train_data_loader: DataLoader, train_epochs_count: int = 10, after_train_save: bool = False, path_on_after_train: str | PathLike = ''):
         """
         Method for training model on images during epoch_count.
         Include execution timer.
@@ -163,6 +163,7 @@ class GameNet(nn.Module):
         :return: nothing.
         """
         try:
+            squeezed_labels: Tensor
             self.__model__.train()
             start_train = datetime.now()
             print_info(f'Training start at - {start_train}.')
@@ -171,8 +172,9 @@ class GameNet(nn.Module):
                 running_loss: float = 0.0
                 for images, labels in train_data_loader:
                     images, labels = images.to(device), labels.to(device)
+                    increased_labels = labels
                     for image in images:
-                        running_loss = self.__neuro_learn__(image, labels, running_loss) # TODO. !!! По прежнему будет ошибка в обратном распространении градиента
+                        running_loss = self.__neuro_learn__(image, increased_labels, running_loss, True)
                     print_info(f'Current train epoch - №{epoch + 1} of {epoch_count.stop}\'s, Loss: {running_loss / len(train_data_loader):.4f}.')
             if after_train_save:
                 print_success('After train save occurred.')
@@ -185,7 +187,7 @@ class GameNet(nn.Module):
             e.add_note('Game net class - train_model method.')
             print_error(f'Error occurred during model training. - {e.with_traceback(None)}.')
 
-    def test_model(self, test_data_loader: DataLoader, test_epochs_count: int = 20, after_test_save: bool = False, path_on_after_test: str | PathLike = ''):
+    def test_model(self, test_data_loader: DataLoader, test_epochs_count: int = 5, after_test_save: bool = False, path_on_after_test: str | PathLike = ''):
         """
         Method for testing model on unseen images.
         :param test_data_loader: object for storing data.
@@ -195,6 +197,7 @@ class GameNet(nn.Module):
         :return: nothing.
         """
         try:
+            squeezed_labels: Tensor
             self.__model__.eval()
             print_info('Testing start:')
             start_time = datetime.now()
@@ -202,8 +205,9 @@ class GameNet(nn.Module):
                 running_loss: float = 0.0
                 for images, labels in test_data_loader:
                     images, labels = images.to(device), labels.to(device)
+                    squeezed_labels = labels.unsqueeze(0).unsqueeze(1).unsqueeze(2)
                     for image in images:
-                        running_loss = self.__neuro_learn__(image, labels, running_loss)
+                        running_loss = self.__neuro_learn__(image, squeezed_labels, running_loss, False)
                     print_info(f'Current test epoch - №{epoch + 1} of {epoch}\'s, Loss: {running_loss / len(test_data_loader):.4f}.')
             if after_test_save:
                 print_error('After test save occurred.')
@@ -214,20 +218,27 @@ class GameNet(nn.Module):
             e.add_note('Game net class - test_model method.')
             print_error(f'Error occurred during model testing. - {e.with_traceback(None)}.')
 
-    def __neuro_learn__(self, image, labels, running_loss: float) -> float:
+    def __neuro_learn__(self, image, labels, running_loss: float, mode: bool) -> float:
         """
         Private inner logic of neuro learning.
         :param image: Image instance to proceed.
         :param labels: Labels of identifiers.
         :param running_loss: Loss value of model.
+        :param mode: Value of train or test.
         :return: Updated running_loss value of model.
         """
         self.__optimizer__.zero_grad()
         outputs = self.__model__(image)
-        print(datetime.now())
-        loss = self.__loss_fn__(outputs, labels)
-        loss.backward()
-        self.__optimizer__.step()
+
+        additional_tensor =  torch.ones(64)
+
+        scalar_tensor = labels
+        to_recog = torch.add(additional_tensor, scalar_tensor)
+        loss = self.__loss_fn__(torch.permute(outputs.squeeze(0), (0, 2, 1)), to_recog)
+        print(f'\tPicture analyzed at {datetime.now().time()}.')
+        with torch.set_grad_enabled(mode):
+            loss.backward()
+            self.__optimizer__.step()
         running_loss += loss.item()
         return running_loss
 
@@ -255,7 +266,7 @@ class GameNet(nn.Module):
                 if parameters is not None:
                     if not is_manual_create:
                         self.__optimizer__ = torch.optim.Adam(self.__model__.parameters(), lr=learning_rate)  # TODO в будущем заменить на Nadam.
-                        self.__loss_fn__: _Loss = BCELoss()
+                        self.__loss_fn__: _Loss = CrossEntropyLoss()
                         print_success('Default optimizer created.')
                     else:
                         counter = 0

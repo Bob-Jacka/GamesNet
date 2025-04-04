@@ -25,7 +25,7 @@ device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
 Value that specifies where will be loaded model with data.
 """
 
-leaky_relu_value: float = 0.01
+leaky_relu_value: float = 0.03
 """
 Used for leaky_relu components of neuro net.
 Cut that value in input signals.
@@ -36,6 +36,8 @@ user_input_cursor: str = '>> '
 User input cursor used in input() function and select_terminal().
 """
 
+###############################Model parameters####################################
+
 model_name = 'network'
 """
 Global name of the model.
@@ -45,6 +47,8 @@ model_ext: Literal['.pth', '.pt', '.pwf'] = '.pth'
 """
 Global model extension of the file.
 """
+###################################################################################
+
 
 optimizers: tuple = ('MSELoss', 'L1Loss', 'BCELoss', 'BCEWithLogitsLoss', 'CrossEntropyLoss', 'NLLLoss')
 """
